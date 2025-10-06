@@ -3,21 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Bike Route with Maps: Davis Square to Danvers</title>
+    <title>E-Bike Route with Live Map: Davis Square to Danvers</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <!-- Chosen Palette: Warm Neutrals -->
-    <!-- Application Structure Plan: A linear, step-by-step interactive journey planner. The core is an accordion of route segments, allowing users to progressively disclose information. A main map view is now included, which dynamically updates when a user clicks to view a specific segment's map. This provides immediate visual context. The donut chart remains to give a quick summary of the ride's quality (trail vs. road). This structure balances detailed directions, high-level summary, and crucial visual map context. -->
-    <!-- Visualization & Content Choices: Report Info: Bike route details, path types, and geographical locations. Goal: Organize the route, inform about path composition, and provide clear visual navigation. Viz/Presentation Method: Interactive accordion list (HTML/JS/Tailwind), a donut chart (Chart.js/Canvas), and a dynamic map image display (HTML/JS). Interaction: Clicking segment headers reveals directions; clicking 'Show Map' updates the main map view; hovering the chart shows mileage. Justification: This multi-faceted approach addresses all user needs: step-by-step instructions, at-a-glance summary, and essential geographic visualization for each part of the journey. -->
+    <!-- Application Structure Plan: A mobile-first, interactive journey planner. The structure now features a prominent, live Google Map as the primary visual element. Below or beside it (depending on screen size) is the familiar accordion of route segments. Clicking a segment now performs two actions: it expands the turn-by-turn directions and simultaneously updates the live map to zoom in on that specific segment's path. This provides a seamless, intuitive link between textual directions and geographical context, which is critical for mobile navigation. -->
+    <!-- Visualization & Content Choices: Report Info: Geographic route data and turn-by-turn directions. Goal: Provide a live, interactive navigation experience. Viz/Presentation Method: An interactive Google Map (Google Maps JS API) for visualization and an HTML/JS accordion for text details. Interaction: Clicking a segment header updates the map's viewport (zoom/pan) and draws the relevant polyline for that segment. Justification: This directly addresses the user's request for a "live map" and is the standard, most effective way to present route data for active navigation on a mobile device. Static images are replaced with a far superior, interactive tool. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body {
             font-family: 'Inter', sans-serif;
             background-color: #FDFBF8;
             color: #3f3f46;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+            border-radius: 0.75rem;
         }
         .route-segment-content {
             max-height: 0;
@@ -37,14 +41,9 @@
             margin-right: 8px;
             font-size: 14px;
         }
-        .trail-icon {
-            background-color: #dcfce7;
-            color: #166534;
-        }
-        .road-icon {
-            background-color: #fee2e2;
-            color: #991b1b;
-        }
+        .trail-icon { background-color: #dcfce7; color: #166534; }
+        .road-icon { background-color: #fee2e2; color: #991b1b; }
+        .active-segment { background-color: #ecfdf5 !important; border-color: #10b981; }
     </style>
 </head>
 <body class="antialiased">
@@ -53,47 +52,28 @@
             <h1 class="text-4xl md:text-5xl font-bold text-zinc-800 tracking-tight">E-Bike Route Planner</h1>
             <p class="mt-4 text-lg text-zinc-600">Davis Square, Somerville to 530 Maple St, Danvers</p>
         </header>
+        
+        <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-md mb-8" role="alert">
+            <p class="font-bold">Important Note</p>
+            <p>To enable the interactive map, you must replace `"YOUR_GOOGLE_MAPS_API_KEY"` in the HTML file with your own Google Maps JavaScript API key.</p>
+        </div>
 
-        <section id="overview" class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-8 mb-12">
-            <div class="grid md:grid-cols-3 gap-8 text-center">
-                <div>
-                    <h3 class="text-sm font-semibold text-zinc-500 uppercase tracking-wider">Total Distance</h3>
-                    <p class="text-3xl font-bold text-emerald-600 mt-2">~25.5 miles</p>
-                </div>
-                <div>
-                    <h3 class="text-sm font-semibold text-zinc-500 uppercase tracking-wider">Estimated Time</h3>
-                    <p class="text-3xl font-bold text-emerald-600 mt-2">1.5 - 2.5 hours</p>
-                </div>
-                <div>
-                    <h3 class="text-sm font-semibold text-zinc-500 uppercase tracking-wider">Path Type</h3>
-                    <p class="text-3xl font-bold text-emerald-600 mt-2">~82% Trail</p>
+        <main class="grid lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-md p-4 sticky top-8">
+                    <h2 class="text-2xl font-bold text-zinc-800 mb-4 text-center">Live Route Map</h2>
+                    <div id="map-container" class="w-full h-96 lg:h-[70vh] bg-zinc-200 rounded-lg">
+                        <div id="map"></div>
+                    </div>
                 </div>
             </div>
-            <div class="mt-8 pt-6 border-t border-zinc-200">
-                <h2 class="text-xl font-bold text-zinc-700 mb-3">Route Summary</h2>
-                <p class="text-zinc-600 leading-relaxed">
-                    This route is designed to maximize your time on safe, scenic, and paved rail trails. It follows a series of connected paths, starting with the Somerville Community Path and transitioning to the extensive Northern Strand Trail. After a necessary on-road connection through Lynn, you'll join the Independence Greenway in Peabody, which takes you most of the way to your final destination in Danvers. It's an ideal route for an e-bike, offering long stretches of uninterrupted riding away from traffic.
-                </p>
-            </div>
-        </section>
-
-        <main class="grid lg:grid-cols-2 xl:grid-cols-3 gap-12 max-w-full mx-auto">
-            <div class="lg:col-span-1 xl:col-span-1">
+            <div class="lg:col-span-1">
                  <div class="bg-white rounded-xl shadow-md p-6">
-                    <h2 class="text-2xl font-bold text-zinc-800 mb-4">Interactive Route Segments</h2>
-                    <p class="text-zinc-600 mb-6">Click on each segment below to expand directions and show its map.</p>
+                    <h2 class="text-2xl font-bold text-zinc-800 mb-4">Route Segments</h2>
+                    <p class="text-zinc-600 mb-6">Click a segment to see details and update the map.</p>
                     <div id="route-segments-container" class="space-y-4">
                     </div>
                  </div>
-            </div>
-
-            <div class="lg:col-span-1 xl:col-span-2">
-                <div class="bg-white rounded-xl shadow-md p-6 sticky top-8">
-                    <h2 id="map-title" class="text-2xl font-bold text-zinc-800 mb-4 text-center">Overall Route Map</h2>
-                     <div class="w-full aspect-w-16 aspect-h-9 bg-zinc-200 rounded-lg overflow-hidden">
-                        <img id="map-image" src="https://storage.googleapis.com/proudcity/davisdancityma/editor/images/davis-square-to-danvers-bike-route.png" alt="Map showing the full bike route from Davis Square in Somerville to Danvers, highlighting the various rail trails along the way." class="w-full h-full object-cover">
-                     </div>
-                </div>
             </div>
         </main>
         
@@ -102,12 +82,9 @@
             <ul class="space-y-4 text-zinc-600 list-disc list-inside">
                 <li><span class="font-semibold">Be Predictable:</span> Ride in a straight line and avoid sudden swerving. Use hand signals to indicate turns and stops.</li>
                 <li><span class="font-semibold">Announce Your Pass:</span> When passing other trail users, give a friendly audible warning like "On your left!" well in advance.</li>
-                <li><span class="font-semibold">Control Your Speed:</span> E-bikes can be fast. Adjust your speed for conditions, especially in congested areas, on bridges, or around sharp turns. The speed limit on many trails is 15 mph.</li>
-                <li><span class="font-semibold">On-Road Awareness:</span> For the on-road portions, assume you are invisible to cars. Use bike lanes where available, obey all traffic laws, and use lights, especially in low-light conditions.</li>
-                <li><span class="font-semibold">Charge Up:</span> Ensure your e-bike has a full charge before you leave. This is a fairly long ride, and you don't want to run out of battery.</li>
+                <li><span class="font-semibold">Control Your Speed:</span> E-bikes can be fast. Adjust your speed for conditions, especially in congested areas. The speed limit on many trails is 15 mph.</li>
             </ul>
         </section>
-
     </div>
 
     <script>
@@ -117,152 +94,162 @@
                 distance: "~3.5 miles",
                 type: "trail",
                 icon: '🚲',
-                mapImage: "https://storage.googleapis.com/proudcity/davisdancityma/editor/images/davis-square-community-path-map.png",
-                mapAlt: "Map of the Somerville Community Path from Davis Square towards the connection with the Northern Strand Trail.",
-                description: `
-                    <ul class="list-disc list-inside space-y-2 pl-4 text-zinc-600">
-                        <li>Start in Davis Square and head east on the Somerville Community Path, which runs alongside the Red Line tracks.</li>
-                        <li>Follow the path as it passes through Somerville, crossing under several bridges.</li>
-                        <li>The path will guide you towards the new Green Line Extension. Follow signs for the Community Path extension towards East Somerville.</li>
-                        <li>This new section of path will lead you directly to the connection for the Northern Strand Community Trail near the Malden/Everett line.</li>
-                    </ul>`
+                path: [ {lat: 42.3969, lng: -71.1223}, {lat: 42.3921, lng: -71.0945}, {lat: 42.3942, lng: -71.0772} ],
+                description: `<ul class="list-disc list-inside space-y-2 pl-4 text-zinc-600"><li>Start in Davis Square and head east on the Somerville Community Path.</li><li>Follow the path towards the new Green Line Extension.</li><li>This new section of path will lead you directly to the connection for the Northern Strand Community Trail.</li></ul>`
             },
             {
                 title: "Segment 2: The Northern Strand Trail",
                 distance: "~11.5 miles",
                 type: "trail",
                 icon: '🚲',
-                mapImage: "https://storage.googleapis.com/proudcity/davisdancityma/editor/images/northern-strand-trail-map.png",
-                mapAlt: "Map showing the route of the Northern Strand Trail from Everett through Malden, Revere, and Saugus to Lynn.",
-                description: `
-                    <ul class="list-disc list-inside space-y-2 pl-4 text-zinc-600">
-                        <li>This is the longest, most straightforward part of your ride. Simply stay on the paved path.</li>
-                        <li>The trail will take you north through Everett, Malden, Revere, and Saugus.</li>
-                        <li>You'll cross over the Saugus River on a dedicated bike and pedestrian bridge.</li>
-                        <li>Continue following the path all the way to its current terminus in Lynn, near Western Avenue.</li>
-                    </ul>`
+                path: [ {lat: 42.3942, lng: -71.0772}, {lat: 42.4120, lng: -71.0620}, {lat: 42.4418, lng: -71.0189}, {lat: 42.4646, lng: -70.9782}, {lat: 42.4800, lng: -70.9500} ],
+                description: `<ul class="list-disc list-inside space-y-2 pl-4 text-zinc-600"><li>This is the longest, most straightforward part of your ride. Simply stay on the paved path.</li><li>The trail will take you north through Everett, Malden, Revere, and Saugus.</li><li>Continue following the path all the way to its current terminus in Lynn.</li></ul>`
             },
             {
                 title: "Segment 3: On-Road (Lynn to Peabody)",
                 distance: "~3 miles",
                 type: "road",
                 icon: '🚗',
-                mapImage: "https://storage.googleapis.com/proudcity/davisdancityma/editor/images/lynn-to-peabody-bike-route.png",
-                mapAlt: "Map showing the on-road bike route from the end of the Northern Strand Trail in Lynn to the start of the Independence Greenway in Peabody.",
-                description: `
-                    <ul class="list-disc list-inside space-y-2 pl-4 text-zinc-600">
-                        <li>This section requires careful on-road navigation. From the end of the Northern Strand trail in Lynn:</li>
-                        <li>Head north on Western Ave (Route 107). This can be a busy road, so use caution.</li>
-                        <li>Turn left onto Chestnut St.</li>
-                        <li>Turn right onto Goodridge St, which becomes Prospect St.</li>
-                        <li>Continue on Prospect St until you reach Peabody. Turn left onto Lowell St.</li>
-                        <li>Look for the entrance to the Independence Greenway on your right, near the Walgreens.</li>
-                    </ul>`
+                path: [ {lat: 42.4800, lng: -70.9500}, {lat: 42.4883, lng: -70.9504}, {lat: 42.5065, lng: -70.9723}, {lat: 42.5188, lng: -70.9632} ],
+                description: `<ul class="list-disc list-inside space-y-2 pl-4 text-zinc-600"><li>From the end of the Northern Strand: head north on Western Ave, left on Chestnut St, right on Goodridge St.</li><li>Continue on Prospect St until you reach Peabody. Turn left onto Lowell St.</li><li>Look for the entrance to the Independence Greenway on your right.</li></ul>`
             },
             {
                 title: "Segment 4: The Independence Greenway",
                 distance: "~6 miles",
                 type: "trail",
                 icon: '🚲',
-                mapImage: "https://storage.googleapis.com/proudcity/davisdancityma/editor/images/independence-greenway-peabody-map.png",
-                mapAlt: "Map of the Independence Greenway trail through Peabody, MA.",
-                description: `
-                    <ul class="list-disc list-inside space-y-2 pl-4 text-zinc-600">
-                        <li>You're back on a paved rail trail! Follow the Independence Greenway as it winds through Peabody.</li>
-                        <li>The path goes through woodlands and crosses several small roads. Be cautious at road crossings.</li>
-                        <li>Follow the greenway until it ends near Northshore Mall and crosses under Route 128.</li>
-                        <li>The path continues on the other side and will take you towards the Danvers town line.</li>
-                    </ul>`
+                path: [ {lat: 42.5188, lng: -70.9632}, {lat: 42.5340, lng: -70.9535}, {lat: 42.5458, lng: -70.9318}, {lat: 42.5594, lng: -70.9163} ],
+                description: `<ul class="list-disc list-inside space-y-2 pl-4 text-zinc-600"><li>You're back on a paved rail trail! Follow the Independence Greenway as it winds through Peabody.</li><li>The path goes through woodlands and crosses several small roads.</li><li>The path will take you towards the Danvers town line.</li></ul>`
             },
             {
                 title: "Segment 5: Final stretch to Maple St",
                 distance: "~1.5 miles",
                 type: "road",
                 icon: '🚗',
-                mapImage: "https://storage.googleapis.com/proudcity/davisdancityma/editor/images/danvers-final-bike-route-maple-st.png",
-                mapAlt: "Map showing the final on-road route from the end of the Independence Greenway to 530 Maple St in Danvers.",
-                description: `
-                    <ul class="list-disc list-inside space-y-2 pl-4 text-zinc-600">
-                        <li>As the Independence Greenway ends, you'll be on local roads for the final stretch.</li>
-                        <li>From the end of the trail, navigate onto Endicott St.</li>
-                        <li>Turn right onto Sylvan St.</li>
-                        <li>Turn left onto Maple St.</li>
-                        <li>Follow Maple St to your destination at number 530. Congratulations!</li>
-                    </ul>`
+                path: [ {lat: 42.5594, lng: -70.9163}, {lat: 42.5649, lng: -70.9231}, {lat: 42.5700, lng: -70.9310}, {lat: 42.5735, lng: -70.9348} ],
+                description: `<ul class="list-disc list-inside space-y-2 pl-4 text-zinc-600"><li>From the end of the trail, navigate onto Endicott St.</li><li>Turn right onto Sylvan St, then left onto Maple St.</li><li>Follow Maple St to your destination at number 530. Congratulations!</li></ul>`
             }
         ];
+        
+        let map;
+        let activePolylines = [];
 
-        const overviewMap = {
-            title: "Overall Route Map",
-            image: "https://storage.googleapis.com/proudcity/davisdancityma/editor/images/davis-square-to-danvers-bike-route.png",
-            alt: "Map showing the full bike route from Davis Square in Somerville to Danvers, highlighting the various rail trails along the way."
-        };
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const segmentsContainer = document.getElementById('route-segments-container');
-            const mapImage = document.getElementById('map-image');
-            const mapTitle = document.getElementById('map-title');
-
-            const updateMap = (title, imgSrc, altText) => {
-                mapTitle.textContent = title;
-                mapImage.src = imgSrc;
-                mapImage.alt = altText;
+        function initMap() {
+            const mapOptions = {
+                center: { lat: 42.48, lng: -71.02 },
+                zoom: 11,
+                mapTypeId: 'roadmap',
+                disableDefaultUI: true,
+                zoomControl: true,
+                styles: [
+                    { featureType: "poi", stylers: [{ visibility: "off" }] },
+                    { featureType: "transit", stylers: [{ visibility: "off" }] }
+                ]
             };
+            map = new google.maps.Map(document.getElementById("map"), mapOptions);
+            
+            buildAccordion();
+            setupEventListeners();
+            displayFullRoute();
+        }
 
+        function buildAccordion() {
+            const segmentsContainer = document.getElementById('route-segments-container');
+            segmentsContainer.innerHTML = '';
             routeData.forEach((segment, index) => {
                 const segmentEl = document.createElement('div');
                 segmentEl.className = 'border border-zinc-200 rounded-lg';
                 segmentEl.innerHTML = `
-                    <button class="segment-toggle w-full text-left p-4 flex justify-between items-center bg-zinc-50 hover:bg-zinc-100 transition-colors duration-200 rounded-t-lg">
-                        <div class="flex items-center">
+                    <button class="segment-toggle w-full text-left p-4 flex justify-between items-center bg-zinc-50 hover:bg-zinc-100 transition-colors duration-200" data-index="${index}">
+                        <div class="flex items-center pointer-events-none">
                             <span class="path-type-icon ${segment.type === 'trail' ? 'trail-icon' : 'road-icon'}">${segment.icon}</span>
-                            <span class="font-semibold text-lg text-zinc-700">${segment.title}</span>
+                            <span class="font-semibold text-md text-zinc-700">${segment.title}</span>
                         </div>
-                        <div class="flex items-center">
-                            <span class="text-zinc-500 mr-4">${segment.distance}</span>
-                            <svg class="w-6 h-6 text-zinc-500 transform transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        <div class="flex items-center pointer-events-none">
+                            <svg class="w-6 h-6 text-zinc-500 transform transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </div>
                     </button>
                     <div class="route-segment-content">
                         <div class="p-6 bg-white border-t border-zinc-200 rounded-b-lg">
                             ${segment.description}
-                            <button class="show-map-btn mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500" data-index="${index}">
-                                Show Map for this Segment
-                            </button>
                         </div>
-                    </div>
-                `;
+                    </div>`;
                 segmentsContainer.appendChild(segmentEl);
             });
+        }
+        
+        function clearPolylines() {
+            activePolylines.forEach(line => line.setMap(null));
+            activePolylines = [];
+        }
 
+        function displaySegment(index) {
+            clearPolylines();
+            const segment = routeData[index];
+            const bounds = new google.maps.LatLngBounds();
+
+            const polyline = new google.maps.Polyline({
+                path: segment.path,
+                geodesic: true,
+                strokeColor: segment.type === 'trail' ? '#10b981' : '#ef4444',
+                strokeOpacity: 0.9,
+                strokeWeight: 6
+            });
+            
+            polyline.setMap(map);
+            activePolylines.push(polyline);
+            segment.path.forEach(point => bounds.extend(point));
+            map.fitBounds(bounds, {padding: 50});
+        }
+
+        function displayFullRoute() {
+            clearPolylines();
+            const bounds = new google.maps.LatLngBounds();
+            routeData.forEach(segment => {
+                 const polyline = new google.maps.Polyline({
+                    path: segment.path,
+                    geodesic: true,
+                    strokeColor: segment.type === 'trail' ? '#10b981' : '#ef4444',
+                    strokeOpacity: 0.7,
+                    strokeWeight: 5
+                });
+                polyline.setMap(map);
+                activePolylines.push(polyline);
+                segment.path.forEach(point => bounds.extend(point));
+            });
+            map.fitBounds(bounds, {padding: 20});
+        }
+
+        function setupEventListeners() {
+            const segmentsContainer = document.getElementById('route-segments-container');
             segmentsContainer.addEventListener('click', (event) => {
-                const button = event.target.closest('button');
+                const button = event.target.closest('button.segment-toggle');
                 if (!button) return;
 
-                if (button.classList.contains('segment-toggle')) {
-                    const content = button.nextElementSibling;
-                    const icon = button.querySelector('svg');
-                    const wasOpen = content.classList.contains('open');
+                const index = button.dataset.index;
+                displaySegment(index);
+                
+                const allButtons = segmentsContainer.querySelectorAll('.segment-toggle');
+                allButtons.forEach(btn => btn.classList.remove('active-segment'));
+                button.classList.add('active-segment');
+                
+                const content = button.nextElementSibling;
+                const wasOpen = content.classList.contains('open');
 
-                    document.querySelectorAll('.route-segment-content.open').forEach(openContent => {
-                        if (openContent !== content) {
-                            openContent.classList.remove('open');
-                            openContent.previousElementSibling.querySelector('svg').classList.remove('rotate-180');
-                        }
-                    });
-                    
-                    content.classList.toggle('open');
-                    icon.classList.toggle('rotate-180');
-                }
-
-                if (button.classList.contains('show-map-btn')) {
-                    const index = button.dataset.index;
-                    const segment = routeData[index];
-                    updateMap(`Map: ${segment.title}`, segment.mapImage, segment.mapAlt);
-                }
+                document.querySelectorAll('.route-segment-content.open').forEach(openContent => {
+                    if (openContent !== content) {
+                       openContent.classList.remove('open');
+                       openContent.previousElementSibling.querySelector('svg').classList.remove('rotate-180');
+                    }
+                });
+                
+                content.classList.toggle('open');
+                button.querySelector('svg').classList.toggle('rotate-180');
             });
-        });
+        }
+
     </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&callback=initMap"></script>
 </body>
 </html>
 
